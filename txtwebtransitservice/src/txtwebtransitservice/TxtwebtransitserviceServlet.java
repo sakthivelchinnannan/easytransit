@@ -59,12 +59,17 @@ public class TxtwebtransitserviceServlet extends HttpServlet {
 			
 			String timeParam = String.valueOf(depTimeInMillis/1000);
 			
-			String usrParams = "Transit details for Departing from " + source + " to " + dest + " now<br \\>\n";
+			String usrParams = "Transit details for Departing from " + source + " to " + dest + " now<br>\n\n";
 			
 			DirectionAPIResponse apiResponse = requestDirectionsAPI(source, dest, "departure_time", timeParam);
 
 			if(apiResponse != null)
 				txtWebResponse = parseJsonRes(apiResponse);
+			else {
+				txtWebResponse = "Failed to get response from Google Maps!";
+				sendResponse(response, formatTWResponse(txtWebResponse));
+				return;
+			}
 
 			if (!txtWebResponse.isEmpty()) {
 				sendResponse(response, formatTWResponse(usrParams + txtWebResponse));
@@ -87,23 +92,21 @@ public class TxtwebtransitserviceServlet extends HttpServlet {
 				timeType = "departure_time";
 			}
 			timeParam = timeParam.trim();
-			usrParams += timeParam + "<br \\>\n";
+			usrParams += timeParam + "<br>\n\n";
 			
 			if (timeParam.indexOf('-') != -1) {
 				// timeParam is of format "d-M-yy (h|h.mm)a" i guess!
 				SimpleDateFormat format = null;
+				timeParam = timeParam.replaceAll(" +", " ");
 				String ptrnToChckMinFldPresence = "(^\\d{1,2}-\\d{1,2}-(\\d{2}|\\d{4})) (\\d{1,2}\\.\\d{1,2}(am|pm))";
 				if (timeParam.matches(ptrnToChckMinFldPresence)) {
-					timeParam = timeParam.replaceAll(" +", " ");
+					format = new SimpleDateFormat("d-M-yy h.mma");
+					format.setTimeZone(TimeZone.getTimeZone("IST"));
+				} else if(timeParam.matches("(^\\d{1,2}-\\d{1,2}-(\\d{2}|\\d{4})) (\\d{1,2}(am|pm))")) {
+					timeParam = timeParam.substring(0, timeParam.indexOf('m')-1) + ".00" + timeParam.substring(timeParam.indexOf('m')-1, timeParam.length());
 					format = new SimpleDateFormat("d-M-yy h.mma");
 					format.setTimeZone(TimeZone.getTimeZone("IST"));
 				} else {
-					
-					/*//TODO: Correct this condition. It's not working! 
-					
-					timeParam = timeParam.replaceAll(" +", " ");
-					format = new SimpleDateFormat("d-M-yy ha");*/
-					
 					txtWebResponse = getSpecifiedMessage("Time parameter is wrong! Please specify it as shown in usage Eg.");
 					sendResponse(response, txtWebResponse);
 					return;
@@ -123,9 +126,14 @@ public class TxtwebtransitserviceServlet extends HttpServlet {
 
 					if(apiResponse != null)
 						txtWebResponse = parseJsonRes(apiResponse);
-
+					else {
+						txtWebResponse = "Failed to get response from Google Maps!";
+						sendResponse(response, formatTWResponse(txtWebResponse));
+						return;
+					}
+					
+					// txtWebResponse += userDttm.toString() + " " + time;
 					if (!txtWebResponse.isEmpty()) {
-						//txtWebResponse += userDttm.toString() + " " + time;
 						sendResponse(response, formatTWResponse(usrParams + txtWebResponse));
 						return;
 					}
@@ -137,7 +145,7 @@ public class TxtwebtransitserviceServlet extends HttpServlet {
 			
 		}
 	
-		sendResponse(response, getSpecifiedMessage(txtWebResponse + "Something went wrong!"));
+		sendResponse(response, getSpecifiedMessage(txtWebResponse + "<br>\nSomething went wrong!"));
 		return;
 	}
 
@@ -205,76 +213,70 @@ public class TxtwebtransitserviceServlet extends HttpServlet {
 										+ " at " + td.getDepartureStop()
 										+ ". Get off at " + td.getArrivalStop()
 										+ "[After " + (td.getNumStops()-1)
-										+ " stop(s)] ";
+										+ " stop(s) "+ st[k].getDuration() + " apprx]. ";
 							}else if(ln.getVehicle().getVehicleType().equals("HEAVY_RAIL")){
 								
-								//Works for Chennai.. i guess!
+								//Works for Chennai
 								
 								txtWebResponse = txtWebResponse + " Get "
 										+ ln.getName() + " "
 										+ ln.getVehicle().getVehicleName()
 										+ "[twrds " + td.getHeadsign() + "] "
 										+ " in " + td.getDepartureStop()
-										+ " at (approx)" + td.getDepartureTimeTxt()
-										+ ". Get off in " + td.getArrivalStop()
-										+ " at (approx)" + td.getArrivalTimeTxt()
+										+ " at (apprx)" + td.getDepartureTimeTxt()
+										+ ". Get off at " + td.getArrivalStop()
+										+ " at (apprx)" + td.getArrivalTimeTxt()
 										+ "[After " + (td.getNumStops()-1)
-										+ " stop(s)] ";
+										+ " stop(s) "+ st[k].getDuration() + " apprx]. ";
 							}
 						} else {
 							txtWebResponse = txtWebResponse
-									+ st[k].getHtmlInstruction() + ".";
+									+ st[k].getHtmlInstruction() + "[" + st[k].getDuration() + " apprx].";
 						}
 					}
 				}
 			}
 		} else if (apiResponse.getStatus().equals("NOT_FOUND")) {
 			txtWebResponse = "One or both of the locations could not be identified!"
-					+ "\nReply with @easytransit SOURCE, DEST[, TIME] to try again."
-					+ "Eg: @easytransit Guindy Chennai, Tambaram Chennai (to get public transit details like buses & trains at current time)<br />\n"
-					+ "@easytransit Guindy Chennai, Tambaram Chennai, d:25-9-12 8.00am (to get details for starting from SOURCE at specified time)<br />\n"
-					+ "@easytransit Guindy Chennai, Tambaram Chennai, a:25-9-12 8.00am (to get details for reaching DEST at specified time)<br />\n";
+					+ "<br>\nReply using @easytransit source,destination[,time] to try again<br>\ntime format: (d/a):d-m-yy h.mm(am/pm) <br>\nEg: @easytransit guindy chennai, tambaram, d:8-10-12 8.15am<br>\n"
+					+ "This gives transit details for \"departing from the source\" at the given time.<br>\nReplace 'd' in the time with 'a' to get results for \"arriving at the destintn\" at specifd time.<br>\n"
+					+ "Avoid the time to get results for \"departing from the source now\".<br>\n(Powered by Intuit TxtWeb and Google Directions API)</body></html>";
 		} else if (apiResponse.getStatus().equals("ZERO_RESULTS")) {
 			txtWebResponse = "No route found for this search!"
-					+ "\nReply with @easytransit SOURCE, DEST[, TIME] to try again."
-					+ "Eg: @easytransit Guindy Chennai, Tambaram Chennai (to get public transit details like buses & trains at current time)<br />\n"
-					+ "@easytransit Guindy Chennai, Tambaram Chennai, d:25-9-12 8.00am (to get details for starting from SOURCE at specified time)<br />\n"
-					+ "@easytransit Guindy Chennai, Tambaram Chennai, a:25-9-12 8.00am (to get details for reaching DEST at specified time)<br />\n";
+					+ "<br>\nReply using @easytransit source,destination[,time] to try again<br>\ntime format: (d/a):d-m-yy h.mm(am/pm) <br>\nEg: @easytransit guindy chennai, tambaram, d:8-10-12 8.15am<br>\n"
+					+ "This gives transit details for \"departing from the source\" at the given time.<br>\nReplace 'd' in the time with 'a' to get results for \"arriving at the destintn\" at specifd time.<br>\n"
+					+ "Avoid the time to get results for \"departing from the source now\".<br>\n(Powered by Intuit TxtWeb and Google Directions API)</body></html>";
 		} else if (apiResponse.getStatus().equals("OVER_QUERY_LIMIT")) {
 			txtWebResponse = "My application exceeded the Directions service's query limit (625 requests for 'TRANSIT' travel mode) for this day!"
-					+ "\nReply with @easytransit SOURCE, DEST[, TIME] to try later (May be tomorrow).<br />\n"
-					+ "Eg: @easytransit Guindy Chennai, Tambaram Chennai (to get public transit details like buses & trains at current time)<br />\n"
-					+ "@easytransit Guindy Chennai, Tambaram Chennai, d:25-9-12 8.00am (to get details for starting from SOURCE at specified time)<br />\n"
-					+ "@easytransit Guindy Chennai, Tambaram Chennai, a:25-9-12 8.00am (to get details for reaching DEST at specified time)<br />\n";
+					+ "<br>\nReply using @easytransit source,destination[,time] to try later(May be tmrw)<br>\ntime format: (d/a):d-m-yy h.mm(am/pm) <br>\nEg: @easytransit guindy chennai, tambaram, d:8-10-12 8.15am<br>\n"
+					+ "This gives transit details for \"departing from the source\" at the given time.<br>\nReplace 'd' in the time with 'a' to get results for \"arriving at the destintn\" at specifd time.<br>\n"
+					+ "Avoid the time to get results for \"departing from the source now\".<br>\n(Powered by Intuit TxtWeb and Google Directions API)</body></html>";
 		} else if (apiResponse.getStatus().equals("REQUEST_DENIED")) {
 			txtWebResponse = "Access denied by the Directions service!"
-					+ "\nReply with @easytransit SOURCE, DEST[, TIME] to try later.";
+					+ "<br>\nReply using @easytransit source,destination[,time] to try again<br>\ntime format: (d/a):d-m-yy h.mm(am/pm) <br>\nEg: @easytransit guindy chennai, tambaram, d:8-10-12 8.15am<br>\n"
+					+ "This gives transit details for \"departing from the source\" at the given time.<br>\nReplace 'd' in the time with 'a' to get results for \"arriving at the destintn\" at specifd time.<br>\n"
+					+ "Avoid the time to get results for \"departing from the source now\".<br>\n(Powered by Intuit TxtWeb and Google Directions API)</body></html>";
 		}
 	
 		return txtWebResponse;
 	}
 	  
 	private String getWelcomeMessage() {
-		return "<html><head><meta name=\"txtweb-appkey\" content=\"f5848a5f-038b-491b-bbc7-3efa9fa5c867\" /></head>" 
-				+ "<body>Welcome to EasyTransit on TxtWeb\n"
-				+ "Reply with @easytransit SOURCE, DEST[, TIME].<br />\n"
-				+ "Eg: @easytransit Guindy Chennai, Tambaram Chennai (to get public transit details like buses & trains at current time)<br />\n"
-				+ "@easytransit Guindy Chennai, Tambaram Chennai, d:25-9-12 8.00am (to get details for starting from SOURCE at specified time)<br />\n"
-				+ "@easytransit Guindy Chennai, Tambaram Chennai, a:25-9-12 8.00am (to get details for reaching DEST at specified time)<br />\n"
-				+ "<br \\>(Powered by Intuit TxtWeb and Google Directions API)</body></html>";
+		return "<html><head><meta name=\"txtweb-appkey\" content=\"f5848a5f-038b-491b-bbc7-3efa9fa5c867\" /></head><body>"
+				+ "Reply using @easytransit source,destination[,time]<br>\ntime format: (d/a):d-m-yy h.mm(am/pm) <br>\nEg: @easytransit guindy chennai, tambaram, d:8-10-12 8.15am<br>\n"
+				+ "This gives transit details for \"departing from the source\" at the given time.<br>\nReplace 'd' in the time with 'a' to get results for \"arriving at the destintn\" at specifd time.<br>\n"
+				+ "Avoid the time to get results for \"departing from the source now\".<br>\n(Powered by Intuit TxtWeb and Google Directions API)</body></html>";
 	}
 	  
 	private String getSpecifiedMessage(String arg) {
 		return "<html><head><meta name=\"txtweb-appkey\" content=\"f5848a5f-038b-491b-bbc7-3efa9fa5c867\" /></head><body>" 
-				+ arg + "Reply with @easytransit SOURCE, DEST[, TIME] to try again.<br />\n"
-				+ "Eg: @easytransit Guindy Chennai, Tambaram Chennai (to get public transit details like buses & trains at current time)<br />\n"
-				+ "@easytransit Guindy Chennai, Tambaram Chennai, d:25-9-12 8.00am (to get details for starting from SOURCE at specified time)<br />\n"
-				+ "@easytransit Guindy Chennai, Tambaram Chennai, a:25-9-12 8.00am (to get details for reaching DEST at specified time)<br />\n"
-				+ "<br \\>(Powered by Intuit TxtWeb and Google Directions API)</body></html>";
+				+ arg + "<br>\nReply using @easytransit source,destination[,time] to try again<br>\ntime format: (d/a):d-m-yy h.mm(am/pm) <br>\nEg: @easytransit guindy chennai, tambaram, d:8-10-12 8.15am<br>\n"
+				+ "This gives transit details for \"departing from the source\" at the given time.<br>\nReplace 'd' in the time with 'a' to get results for \"arriving at the destintn\" at specifd time.<br>\n"
+				+ "Avoid the time to get results for \"departing from the source now\".<br>\n(Powered by Intuit TxtWeb and Google Directions API)</body></html>";
 	}
 	
 	private String formatTWResponse(String tWRes) {
 		return "<html><head><meta name=\"txtweb-appkey\" content=\"f5848a5f-038b-491b-bbc7-3efa9fa5c867\" /></head><body>"
-				+ tWRes + "\n<br \\>(Powered by Intuit TxtWeb and Google Directions API)</body></html>";
+				+ tWRes + "<br>\n(Powered by Intuit TxtWeb and Google Directions API)</body></html>";
 	}
 }
