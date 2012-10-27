@@ -182,7 +182,6 @@ public class TxtwebtransitserviceServlet extends HttpServlet {
 	}
 	
 	//TODO: Have to display copyrights and warnings!
-	//TODO: Have to calculate and display departure time for Bus! #Important
 	private String parseJsonRes(DirectionAPIResponse apiResponse){
 		String txtWebResponse = "";
 		if (apiResponse.getStatus().equals("OK")) {
@@ -205,12 +204,13 @@ public class TxtwebtransitserviceServlet extends HttpServlet {
 							Line ln = td.getLine();
 							
 							if(ln.getVehicle().getVehicleType().equals("BUS")){
-								txtWebResponse = txtWebResponse + " Get "
+								txtWebResponse = txtWebResponse + " Get " /*
+										+ ln.getName() + " "*/ 
 										+ ln.getShortName() + " "
-										+ ln.getVehicle().getVehicleName() /*+ "["
-										+ ln.getName() + "]"*/ 
+										+ ln.getVehicle().getVehicleName()
 										+ "[twrds " + td.getHeadsign() + "] "
-										+ " at " + td.getDepartureStop()
+										+ " in " + td.getDepartureStop()
+										+ " at (apprx)" + td.getDepartureTimeTxt()
 										+ ". Get off at " + td.getArrivalStop()
 										+ "[After " + (td.getNumStops()-1)
 										+ " stop(s) "+ st[k].getDuration() + " apprx]. ";
@@ -225,7 +225,6 @@ public class TxtwebtransitserviceServlet extends HttpServlet {
 										+ " in " + td.getDepartureStop()
 										+ " at (apprx)" + td.getDepartureTimeTxt()
 										+ ". Get off at " + td.getArrivalStop()
-										+ " at (apprx)" + td.getArrivalTimeTxt()
 										+ "[After " + (td.getNumStops()-1)
 										+ " stop(s) "+ st[k].getDuration() + " apprx]. ";
 							}
